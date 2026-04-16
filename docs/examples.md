@@ -42,9 +42,9 @@ SDK 和 CLI 共用 `~/.config/aistation/auth.json` 和 `~/.config/aistation/conf
 import aistation as A
 
 client = A.AiStationClient.from_config()
-user = client.login(account="zhoujingbo", password="XXX")
+user = client.login(account="{USER}", password="XXX")
 print(f"{user.account} role={user.role_type} group={user.group_id[:8]}")
-# → zhoujingbo role=2 group=087e233e
+# → {USER} role=2 group=087e233e
 # token 已自动缓存到 auth.json，后续进程可 ensure_auth() 秒复用
 ```
 
@@ -60,10 +60,10 @@ client.ensure_auth()          # 有 token 就复用；没 token 才登录
 ### 方式 C：CLI（更友好，含交互式验证码）
 
 ```bash
-export AISTATION_ACCOUNT=zhoujingbo
+export AISTATION_ACCOUNT={USER}
 export AISTATION_PASSWORD='XXX'
 aistation login
-# ✓ Logged in as zhoujingbo (role=2)
+# ✓ Logged in as {USER} (role=2)
 
 # 若服务器触发验证码：
 # ▸ Captcha required (saved: /tmp/aistation-captcha.png)
@@ -79,12 +79,12 @@ import aistation as A
 
 client = A.AiStationClient.from_config()
 try:
-    client.login("zhoujingbo", "XXX")
+    client.login("{USER}", "XXX")
 except AiStationError as e:
     if e.err_code == "IBASE_IAUTH_CAPTCHA_EMPTY":
         b64_png = client.fetch_captcha()        # 拉新验证码 (base64 PNG)
         code = input("captcha: ")
-        client.login("zhoujingbo", "XXX", captcha=code)
+        client.login("{USER}", "XXX", captcha=code)
 ```
 
 ---
@@ -163,7 +163,7 @@ spec = A.TaskSpec(
     name="mytrain",                 # 只允许字母数字！
     resource_group="8A100_80",
     image="pytorch/pytorch:21.10-py3",
-    command="bash /zhoujingbo/run.sh",
+    command="bash /{USER}/run.sh",
     cards=2, cpu=16, memory_gb=32,
     shm_size=4,
     ports=[19810, 22],
@@ -308,7 +308,7 @@ from aistation import presets
 
 existing = c.tasks.get("GFM")                # 已知能跑的任务
 spec = presets.from_existing(existing)        # 反推 TaskSpec
-spec.command = "bash /zhoujingbo/new_script.sh"
+spec.command = "bash /{USER}/new_script.sh"
 spec.name = "GFMv2"
 new_task = c.tasks.create(spec)
 ```
@@ -414,7 +414,7 @@ crontab：
 ```bash
 # 登录
 aistation login                           # 交互式（TTY 下提示账号密码）
-aistation login -u zhoujingbo -p -        # 密码从 stdin
+aistation login -u {USER} -p -        # 密码从 stdin
 echo $PASS | aistation login -u X -p -
 
 # 看状态

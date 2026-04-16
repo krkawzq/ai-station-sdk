@@ -5,17 +5,28 @@ from typing import Annotated
 
 import typer
 
+from . import _short
 from ._client import make_client
 from ._error import render_and_exit
-from ._output import OutputFormat, print_json, print_quiet, print_table, resolve_format
+from ._output import (
+    OutputFormat,
+    print_json,
+    print_quiet,
+    print_table,
+    resolve_context_output,
+    resolve_short_mode,
+)
 
 
 def cmd_envs(
     ctx: typer.Context,
     include_halted: Annotated[bool, typer.Option("--include-halted", help="Include Halt/stopped")] = False,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
 ) -> None:
     """List my dev envs (workplatforms)."""
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    short_mode = resolve_short_mode(ctx.obj, output=output, short_out=short_out)
     try:
         client = make_client(
             require_token=True,
@@ -27,10 +38,10 @@ def cmd_envs(
     except Exception as exc:  # noqa: BLE001
         render_and_exit(exc, output=output)
 
-    if ctx.obj.get("quiet"):
+    if output is OutputFormat.JSON:
+        print_json([_short.workplatform(e) for e in envs] if short_mode else envs)
+    elif ctx.obj.get("quiet"):
         print_quiet([e.wp_id for e in envs])
-    elif output is OutputFormat.JSON:
-        print_json(envs)
     else:
         rows = []
         for e in envs:
@@ -46,9 +57,12 @@ def cmd_envs_history(
     ctx: typer.Context,
     size: Annotated[int, typer.Option("--size", help="Page size")] = 20,
     page: Annotated[int, typer.Option("--page", help="Page number")] = 1,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
 ) -> None:
     """List historical dev envs."""
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    short_mode = resolve_short_mode(ctx.obj, output=output, short_out=short_out)
     try:
         client = make_client(
             require_token=True,
@@ -61,7 +75,7 @@ def cmd_envs_history(
         render_and_exit(exc, output=output)
 
     if output is OutputFormat.JSON:
-        print_json(envs)
+        print_json([_short.workplatform(e) for e in envs] if short_mode else envs)
     else:
         rows = []
         for e in envs:
@@ -76,9 +90,12 @@ def cmd_envs_history(
 def cmd_env_get(
     ctx: typer.Context,
     wp_id: Annotated[str, typer.Argument(help="WorkPlatform ID")],
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
 ) -> None:
     """Show a single dev env's detail."""
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    short_mode = resolve_short_mode(ctx.obj, output=output, short_out=short_out)
     try:
         client = make_client(
             require_token=True,
@@ -91,7 +108,7 @@ def cmd_env_get(
         render_and_exit(exc, output=output)
 
     if output is OutputFormat.JSON:
-        print_json(env)
+        print_json(_short.workplatform(env) if short_mode else env)
     else:
         print_table(
             f"Dev Env {env.wp_name}",

@@ -13,12 +13,13 @@ from typing import Annotated
 import typer
 
 from .. import __version__
+from . import _short
 from . import auth as auth_cmd
 from . import envs as envs_cmd
 from . import query as query_cmd
 from . import status as status_cmd
 from . import tasks as tasks_cmd
-from ._output import print_json, resolve_format
+from ._output import print_json, resolve_context_output
 from ..config import load_config
 
 
@@ -38,6 +39,9 @@ def _root(
         str | None, typer.Option("--output", "-o", help="table / json (auto by default)")
     ] = None,
     json_out: Annotated[bool, typer.Option("--json", help="Alias for --output json")] = False,
+    short_out: Annotated[
+        bool, typer.Option("--short", help="When output is JSON, only print key fields")
+    ] = False,
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Print only core values")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose logging to stderr")] = False,
     timeout: Annotated[float | None, typer.Option("--timeout", help="Override default_timeout (s)")] = None,
@@ -50,6 +54,7 @@ def _root(
         fmt_str = "json"
     ctx.obj = {
         "output": fmt_str,
+        "short": short_out,
         "quiet": quiet,
         "verbose": verbose,
         "timeout": timeout,
@@ -82,8 +87,10 @@ def _task_logs_cmd(
     ctx: typer.Context,
     task_id: Annotated[str, typer.Argument(help="Task ID")],
     pod: Annotated[str | None, typer.Option("--pod", help="Specific pod name")] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
 ) -> None:
-    tasks_cmd.cmd_task_logs(ctx, task_id, pod=pod)
+    tasks_cmd.cmd_task_logs(ctx, task_id, pod=pod, json_out=json_out, short_out=short_out)
 
 
 # ---------- envs (read-only) ----------
@@ -98,11 +105,15 @@ app.command("status", help="One-screen overview")(status_cmd.cmd_status)
 
 # ---------- config / version ----------
 @app.command("config", help="Print the loaded Config as JSON/table")
-def _config_cmd(ctx: typer.Context) -> None:
-    output = resolve_format(ctx.obj.get("output"))
+def _config_cmd(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
+) -> None:
+    output = resolve_context_output(ctx.obj, json_out=json_out)
     cfg = load_config(ctx.obj.get("config_path"))
     from dataclasses import asdict
-    data = asdict(cfg)
+    data = _short.config(cfg) if output.value == "json" and (short_out or ctx.obj.get("short")) else asdict(cfg)
     if output.value == "json":
         print_json(data)
     else:
@@ -111,8 +122,13 @@ def _config_cmd(ctx: typer.Context) -> None:
 
 
 @app.command("version", help="Print the installed version")
-def _version_cmd(ctx: typer.Context) -> None:
-    output = resolve_format(ctx.obj.get("output"))
+def _version_cmd(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
+) -> None:
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    _ = short_out
     if output.value == "json":
         print_json({"version": __version__})
     else:

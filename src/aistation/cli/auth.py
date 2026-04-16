@@ -11,7 +11,7 @@ from ..config import load_auth, save_auth
 from ..errors import InvalidCredentials
 from ._client import make_client
 from ._error import EXIT_AUTH, render_and_exit
-from ._output import OutputFormat, err, print_json, print_quiet, resolve_format, success
+from ._output import OutputFormat, err, print_json, print_quiet, resolve_context_output, success
 
 
 def _resolve_credentials(
@@ -109,6 +109,8 @@ def cmd_login(
     captcha: Annotated[
         str | None, typer.Option("--captcha", "-c", help="Captcha code (skip to auto-prompt)")
     ] = None,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
 ) -> None:
     """Log in with SM2-encrypted password and cache the token.
 
@@ -119,7 +121,7 @@ def cmd_login(
     - Empty credentials / repeated captcha abandonment abort without hitting
       the network.
     """
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
     interactive = not ctx.obj.get("quiet") and output is not OutputFormat.JSON
     CAPTCHA_CODES = {
         "IBASE_IAUTH_CAPTCHA_EMPTY",
@@ -151,10 +153,9 @@ def cmd_login(
     except Exception as exc:  # noqa: BLE001
         render_and_exit(exc, output=output)
     assert user is not None  # narrow for type-checker
+    _ = short_out
 
-    if ctx.obj.get("quiet"):
-        print_quiet(user.token)
-    elif output is OutputFormat.JSON:
+    if output is OutputFormat.JSON:
         print_json({
             "account": user.account,
             "user_name": user.user_name,
@@ -163,13 +164,20 @@ def cmd_login(
             "role_type": user.role_type,
             "token": user.token,
         })
+    elif ctx.obj.get("quiet"):
+        print_quiet(user.token)
     else:
         success(f"Logged in as [bold]{user.account}[/bold] ({user.user_name}), role={user.role_type}")
 
 
-def cmd_logout(ctx: typer.Context) -> None:
+def cmd_logout(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
+) -> None:
     """Clear the cached token (keeps account/password on disk)."""
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    _ = short_out
     try:
         auth = load_auth(ctx.obj.get("auth_path"))
         auth.token = ""
@@ -183,13 +191,18 @@ def cmd_logout(ctx: typer.Context) -> None:
         success("Token cleared")
 
 
-def cmd_whoami(ctx: typer.Context) -> None:
+def cmd_whoami(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
+) -> None:
     """Print the currently-logged-in account (from local token cache).
 
     Does not hit the server. If you want to verify the token is still valid
     call ``aistation ping`` instead.
     """
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    _ = short_out
     try:
         auth = load_auth(ctx.obj.get("auth_path"))
     except Exception as exc:  # noqa: BLE001
@@ -205,22 +218,27 @@ def cmd_whoami(ctx: typer.Context) -> None:
         "token_cached": bool(auth.token),
         "token_saved_at": auth.token_saved_at or None,
     }
-    if ctx.obj.get("quiet"):
-        print_quiet(auth.account)
-    elif output is OutputFormat.JSON:
+    if output is OutputFormat.JSON:
         print_json(info)
+    elif ctx.obj.get("quiet"):
+        print_quiet(auth.account)
     else:
         from ._output import print_table
         print_table("Current User", ("FIELD", "VALUE"), list(info.items()))
 
 
-def cmd_ping(ctx: typer.Context) -> None:
+def cmd_ping(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
+) -> None:
     """Health check: server reachable? token valid?
 
     Does not require a token — if no token is cached, ``token_valid`` is
     simply reported as ``null``.
     """
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    _ = short_out
     try:
         client = make_client(
             auth_path=ctx.obj.get("auth_path"),

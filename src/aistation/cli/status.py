@@ -1,16 +1,23 @@
 """Dashboard: one-screen summary."""
 from __future__ import annotations
 
+from typing import Annotated
+
 import typer
 
 from ._client import make_client
 from ._error import render_and_exit
-from ._output import OutputFormat, err, print_json, print_table, resolve_format
+from ._output import OutputFormat, err, print_json, print_table, resolve_context_output
 
 
-def cmd_status(ctx: typer.Context) -> None:
+def cmd_status(
+    ctx: typer.Context,
+    json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
+    short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
+) -> None:
     """One-screen overview: user, free groups, running tasks, active envs."""
-    output = resolve_format(ctx.obj.get("output"))
+    output = resolve_context_output(ctx.obj, json_out=json_out)
+    _ = short_out
     try:
         client = make_client(
             require_token=True,
