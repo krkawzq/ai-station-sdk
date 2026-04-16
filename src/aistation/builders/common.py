@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .._refs import coerce_image_ref
+
 
 def build_env_entries(env: dict[str, str] | None) -> list[dict[str, str]] | None:
     if not env:
@@ -24,8 +26,8 @@ def normalize_task_model(model: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def resolve_image_ref(image_ref: str, registry_prefix: str) -> str:
-    ref = image_ref.strip()
+def resolve_image_ref(image_ref: Any, registry_prefix: str) -> str:
+    ref = coerce_image_ref(image_ref)
     if ref.count("/") >= 2 and ":" in ref.rsplit("/", 1)[-1]:
         return ref
     prefix = registry_prefix.rstrip("/")

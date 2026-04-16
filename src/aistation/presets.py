@@ -43,7 +43,7 @@ def gpu_hold(
     Example::
 
         spec = presets.gpu_hold(resource_group="8A100_80", cards=2, hours=4)
-        task = client.tasks.create(spec)
+        task = client.tasks.create(spec).entity
     """
     if command is None:
         if hours is not None and hours > 0:
@@ -146,7 +146,7 @@ def from_existing(task: Any, *, name_prefix: str = "clone") -> TaskSpec:
         existing = client.tasks.get("GFM")
         spec = presets.from_existing(existing)
         spec.command = "bash new_script.sh"
-        client.tasks.create(spec)
+        client.tasks.create(spec).entity
     """
     import json as _json
     try:

@@ -153,7 +153,7 @@ def _invoke_json(args: list[str]) -> Any:
         (["whoami", "--json"], ("account",), "alice"),
         (["ping", "--json"], ("reachable",), True),
         (["config", "--json"], ("default_timeout",), 9.0),
-        (["version", "--json"], ("version",), "0.1.0"),
+        (["version", "--json"], ("version",), "0.2.0"),
         (["logout", "--json"], ("logged_out",), True),
         (["login", "--json"], ("account",), "alice"),
     ],

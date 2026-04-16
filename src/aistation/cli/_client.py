@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..client import AiStationClient
+from ..enums import AuthMode
 from ..errors import TokenExpired
 
 
@@ -31,7 +32,11 @@ def make_client(
       :class:`TokenExpired` immediately so the user sees a useful error rather
       than a silent login attempt with (possibly stale) saved credentials.
     """
-    client = AiStationClient.from_config(auth_path=auth_path, config_path=config_path)
+    client = AiStationClient.from_config(
+        auth_path=auth_path,
+        config_path=config_path,
+        auth_mode=AuthMode.MANUAL,
+    )
     if timeout is not None:
         client.config.default_timeout = timeout
     if login:
@@ -47,7 +52,7 @@ def make_client(
             client.ensure_auth()
         else:
             # Prime the session header from the cached token without hitting
-            # the server. If the token is stale, the next real call will get
-            # TokenExpired, which the client's retry logic handles.
+            # the server. If the token is stale, the next real call will surface
+            # TokenExpired and the CLI can ask the user to log in explicitly.
             client.session.headers["X-Auth-Token"] = client.auth.token
     return client

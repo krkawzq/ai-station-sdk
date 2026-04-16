@@ -4,8 +4,10 @@ import pytest
 
 from aistation.errors import (
     AiStationError,
+    AmbiguousMatchError,
     AuthError,
     InvalidCredentials,
+    NotFoundError,
     PermissionDenied,
     ResourceError,
     SpecValidationError,
@@ -86,3 +88,13 @@ def test_lookup_error_guide_and_spec_validation_error() -> None:
     err = SpecValidationError("bad spec", field_name="name")
     assert err.err_code == "SDK_SPEC_VALIDATION"
     assert err.field_name == "name"
+
+
+def test_not_found_and_ambiguous_match_use_sdk_error_codes() -> None:
+    missing = NotFoundError("task", "abc")
+    ambiguous = AmbiguousMatchError("image", "pytorch", matches=["x", "y"])
+
+    assert missing.err_code == "SDK_NOT_FOUND"
+    assert ambiguous.err_code == "SDK_AMBIGUOUS_MATCH"
+    assert missing.hint() is not None
+    assert ambiguous.hint() is not None

@@ -3,6 +3,7 @@
 Public surface:
 
 - :class:`AiStationClient` — the main entrypoint
+- :mod:`aistation.aio` — async surface
 - :class:`TaskSpec` — user-friendly input for creating tasks
 - Model dataclasses: User, Node, ResourceGroup, Image, Task, Pod, Port, JobVolume
 - Exception hierarchy: AiStationError + subtypes, each with ``.hint()``
@@ -11,17 +12,19 @@ Public surface:
 - Subpackages: :mod:`aistation.presets`, :mod:`aistation.recommend`,
   :mod:`aistation.watch`, :mod:`aistation.validation`
 """
-from . import presets, recommend, specs, validation, watch
+from . import aio, presets, recommend, specs, validation, watch
 from .cache import TTLCache
 from .client import AiStationClient
 from .config import AuthData, Config, load_auth, load_config, save_auth
 from .discovery import DiscoveryReport, DiscoveryStep, discover_payload_requirements
 from .enums import (
+    AuthMode,
     CardKind,
     FunctionModel,
     ImageType,
     MakeType,
     PodStatus,
+    ReauthPolicy,
     RoleType,
     ShareType,
     SwitchType,
@@ -29,8 +32,10 @@ from .enums import (
 )
 from .errors import (
     AiStationError,
+    AmbiguousMatchError,
     AuthError,
     InvalidCredentials,
+    NotFoundError,
     PermissionDenied,
     ResourceError,
     SpecValidationError,
@@ -41,10 +46,12 @@ from .errors import (
 )
 from .form_context import enumerate_form_context
 from .modeling import (
+    AuthStatus,
     FormContext,
     Image,
     JobVolume,
     Node,
+    OperationResult,
     Pod,
     Port,
     ResourceGroup,
@@ -54,11 +61,15 @@ from .modeling import (
 )
 from .specs import TaskSpec, WorkPlatformSpec
 
-__version__ = "0.1.0"
+AsyncAiStationClient = aio.AsyncAiStationClient
+
+__version__ = "0.2.0"
 
 __all__ = [
     # main client
     "AiStationClient",
+    "AsyncAiStationClient",
+    "aio",
     # config / auth
     "Config",
     "AuthData",
@@ -77,12 +88,16 @@ __all__ = [
     "AuthError",
     "InvalidCredentials",
     "TokenExpired",
+    "NotFoundError",
+    "AmbiguousMatchError",
     "PermissionDenied",
     "ValidationError",
     "SpecValidationError",
     "ResourceError",
     "TransportError",
     # enums
+    "AuthMode",
+    "ReauthPolicy",
     "SwitchType",
     "CardKind",
     "PodStatus",
@@ -105,6 +120,8 @@ __all__ = [
     "WorkPlatform",
     "WorkPlatformSpec",
     "FormContext",
+    "AuthStatus",
+    "OperationResult",
     # submodules
     "presets",
     "recommend",

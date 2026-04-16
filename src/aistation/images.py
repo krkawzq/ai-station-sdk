@@ -3,8 +3,11 @@ from __future__ import annotations
 import builtins
 from typing import TYPE_CHECKING, Any
 
+from ._resolve import resolve_many as _resolve_many
+from ._resolve import resolve_one as _resolve_one
 from .cache import TTLCache
 from .modeling.images import Image, ImageType_
+from .modeling.runtime import OperationResult
 
 if TYPE_CHECKING:
     from .client import AiStationClient
@@ -54,38 +57,46 @@ class ImagesAPI:
         self._types_cache.set(types)
         return types
 
+    def resolve_many(self, image_ref: str) -> list[Image]:
+        return _resolve_many(
+            image_ref,
+            self.list(),
+            key_fns=(
+                lambda item: item.id,
+                lambda item: item.full_ref,
+                self._short_ref,
+                lambda item: item.name,
+            ),
+        )
+
     def resolve(self, image_ref: str) -> Image:
-        query = image_ref.strip()
-        images = self.list()
+        return _resolve_one(
+            image_ref,
+            self.list(),
+            key_fns=(
+                lambda item: item.id,
+                lambda item: item.full_ref,
+                self._short_ref,
+                lambda item: item.name,
+            ),
+            label_fn=lambda item: item.full_ref,
+            resource_type="image",
+        )
 
-        exact = [image for image in images if image.full_ref == query]
-        if len(exact) == 1:
-            return exact[0]
-
-        short_exact = [image for image in images if self._short_ref(image) == query]
-        if len(short_exact) == 1:
-            return short_exact[0]
-
-        suffix = [image for image in images if image.full_ref.endswith(query) or self._short_ref(image).endswith(query)]
-        if len(suffix) == 1:
-            return suffix[0]
-
-        contains = [image for image in images if query in image.full_ref or query in self._short_ref(image)]
-        if len(contains) == 1:
-            return contains[0]
-
-        if not exact and not short_exact and not suffix and not contains:
-            raise ValueError(f"image not found: {image_ref!r}")
-        raise ValueError(f"ambiguous image reference: {image_ref!r}")
-
-    def check(self, image_name: str, image_tag: str) -> dict[str, Any]:
+    def check(self, image_name: str, image_tag: str) -> OperationResult[Image]:
+        payload = {"imageName": image_name, "imageTag": image_tag}
         data = self._c.post(
             "/api/iresource/v1/images/check",
-            json={"imageName": image_name, "imageTag": image_tag},
+            json=payload,
         )
         if not isinstance(data, dict):
             raise ValueError("unexpected image check payload")
-        return data
+        return OperationResult(
+            action="check",
+            resource_type="image",
+            payload=payload,
+            raw=data,
+        )
 
     def import_external(
         self,
@@ -98,7 +109,7 @@ class ImagesAPI:
         alias_name: str = "",
         username: str = "",
         password: str = "",
-    ) -> dict[str, Any]:
+    ) -> OperationResult[Image]:
         body = {
             "imageName": image_name,
             "imageTag": image_tag,
@@ -113,7 +124,20 @@ class ImagesAPI:
         if not isinstance(data, dict):
             raise ValueError("unexpected image import payload")
         self.invalidate_cache()
-        return data
+        target_id = ""
+        for key in ("id", "taskId", "imageId"):
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                target_id = value
+                break
+        return OperationResult(
+            action="import_external",
+            resource_type="image",
+            payload=body,
+            raw=data,
+            target_id=target_id or None,
+            target_ids=[target_id] if target_id else [],
+        )
 
     def progress(self, task_id: str) -> dict[str, Any]:
         data = self._c.get("/api/iresource/v1/images/progress", params={"id": task_id})

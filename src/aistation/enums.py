@@ -3,6 +3,19 @@ from __future__ import annotations
 from enum import IntEnum, StrEnum
 
 
+class AuthMode(StrEnum):
+    AUTO = "auto"
+    TOKEN_ONLY = "token_only"
+    LOGIN_IF_POSSIBLE = "login_if_possible"
+    MANUAL = "manual"
+
+
+class ReauthPolicy(StrEnum):
+    AUTO = "auto"
+    NEVER = "never"
+    IF_POSSIBLE = "if_possible"
+
+
 class SwitchType(StrEnum):
     IB = "ib"
     ETH = "eth"

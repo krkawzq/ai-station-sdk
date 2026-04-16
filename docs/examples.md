@@ -41,11 +41,11 @@ SDK 和 CLI 共用 `~/.config/aistation/auth.json` 和 `~/.config/aistation/conf
 ```python
 import aistation as A
 
-client = A.AiStationClient.from_config()
+client = A.AiStationClient()
 user = client.login(account="{USER}", password="XXX")
 print(f"{user.account} role={user.role_type} group={user.group_id[:8]}")
 # → {USER} role=2 group=087e233e
-# token 已自动缓存到 auth.json，后续进程可 ensure_auth() 秒复用
+# token 已自动缓存到 auth.json，后续进程直接 AiStationClient() 即可复用
 ```
 
 ### 方式 B：从缓存恢复（最常见）
@@ -53,11 +53,43 @@ print(f"{user.account} role={user.role_type} group={user.group_id[:8]}")
 ```python
 import aistation as A
 
-client = A.AiStationClient.from_config()
-client.ensure_auth()          # 有 token 就复用；没 token 才登录
+client = A.AiStationClient()  # 自动加载本地 auth/config；有 token 就复用，stale token 会按配置自动刷新
 ```
 
-### 方式 C：CLI（更友好，含交互式验证码）
+### 方式 C：控制自动认证策略
+
+```python
+import aistation as A
+
+client = A.AiStationClient(auth_mode=A.AuthMode.TOKEN_ONLY)        # 只恢复本地 token
+manual = A.AiStationClient(auth_mode=A.AuthMode.MANUAL)            # 完全手动
+eager = A.AiStationClient(auth_mode=A.AuthMode.LOGIN_IF_POSSIBLE)  # 只要能登就提前刷新
+strict = A.AiStationClient(reauth_policy=A.ReauthPolicy.NEVER)     # 请求遇到过期 token 时不自动重登
+
+print(client.auth_status())
+```
+
+### 方式 D：配合上下文管理
+
+```python
+import aistation as A
+
+with A.AiStationClient() as client:
+    print(client.groups.list())
+```
+
+### 方式 F：Async client
+
+```python
+import aistation as A
+
+async with A.AsyncAiStationClient() as client:
+    print(client.auth_status())
+    groups = await client.groups.list()
+    print(groups[0].group_name if groups else "no-groups")
+```
+
+### 方式 E：CLI（更友好，含交互式验证码）
 
 ```bash
 export AISTATION_ACCOUNT={USER}
@@ -77,7 +109,7 @@ aistation login
 from aistation.errors import AiStationError
 import aistation as A
 
-client = A.AiStationClient.from_config()
+client = A.AiStationClient()
 try:
     client.login("{USER}", "XXX")
 except AiStationError as e:
@@ -95,7 +127,7 @@ except AiStationError as e:
 
 ```python
 import aistation as A
-c = A.AiStationClient.from_config(); c.ensure_auth()
+c = A.AiStationClient()
 
 for g in c.groups.list():
     if g.free_cards > 0:
@@ -139,20 +171,21 @@ print(f"missing: {ctx.missing}")   # role=2 无权限的 endpoint 会记录在�
 
 ```python
 import aistation as A
-c = A.AiStationClient.from_config(); c.ensure_auth()
+c = A.AiStationClient()
 
-spec = A.presets.gpu_hold(
+spec = A.TaskSpec.gpu_hold(
     resource_group="8A100_80",
     cards=1, cpu=8, memory_gb=16,
     image="pytorch/pytorch:21.10-py3",
     hours=2,                      # 2 小时后自动结束；None = sleep infinity
 )
-task = c.tasks.create(spec)
+result = c.tasks.create(spec)
+task = result.unwrap()
 # create() 默认开启 validate + precheck + idempotent：
 #   - 客户端预校验（name 正则 / memory / mount 等）
 #   - 服务器 dry-run（/train/check-resources）
 #   - 幂等：同名已存在直接返回已有任务
-print(f"✓ created  id={task.id}  status={task.status}")
+print(f"✓ created={result.created} reused={result.reused} id={task.id}")
 ```
 
 ### 3b. 手写完整 spec
@@ -170,13 +203,13 @@ spec = A.TaskSpec(
     switch_type="ib",
     card_kind="GPU",
 )
-task = c.tasks.create(spec)
+task = c.tasks.create(spec).entity
 ```
 
 ### 3c. 只看 payload 不提交（调试）
 
 ```python
-payload = c.tasks.create(spec, dry_run=True)
+payload = c.tasks.create(spec, dry_run=True).payload
 import json
 print(json.dumps(payload, indent=2, ensure_ascii=False))
 ```
@@ -185,7 +218,7 @@ print(json.dumps(payload, indent=2, ensure_ascii=False))
 
 ```python
 result = c.tasks.check_resources(spec)   # POST /train/check-resources
-print(result)  # flag=True 表示 payload 合法且当前可调度
+print(result.action, result.raw)         # result.raw 为服务端返回的校验结果
 ```
 
 ---
@@ -215,6 +248,31 @@ for p in pods:
         print(f"  → {url}")           # e.g. 192.168.105.24:31063
 ```
 
+### 4b. 直接把 Task 对象继续传给 API
+
+```python
+task = c.tasks.create_and_wait(spec).unwrap()
+pods = c.tasks.wait_pods(task)      # 不需要再手动 task.id
+log = c.tasks.read_log(task)
+stopped = c.tasks.stop(task)
+print(len(pods), len(log), stopped.target_id)
+```
+
+### async 版等待任务 Running
+
+```python
+import aistation as A
+from aistation import aio
+
+async with A.AsyncAiStationClient() as c:
+    result = await c.tasks.create(spec)
+    task = result.entity
+    if task is not None:
+        running = await aio.watch.wait_running(c, task.id, timeout=300)
+        pods = await aio.watch.wait_pods(c, task.id)
+        print(running.status, pods[0].external_urls if pods else [])
+```
+
 ### 读日志
 
 ```python
@@ -225,9 +283,13 @@ print(log[-2000:])                    # 末尾 2KB
 ### 停止 / 删除
 
 ```python
-c.tasks.stop(task.id)                 # 运行中任务停止
-c.tasks.delete(task.id)               # 软删除（从列表隐藏，记录保留 deleteFlag=true）
-c.tasks.delete(["id1", "id2", "id3"]) # 批量
+stopped = c.tasks.stop(task.id)
+deleted = c.tasks.delete(task.id)
+batch = c.tasks.delete(["id1", "id2", "id3"])
+
+print(stopped.action, stopped.target_id)
+print(deleted.action, deleted.target_ids)
+print(batch.raw)
 ```
 
 ---
@@ -244,17 +306,16 @@ for g in c.workplatforms.list_groups():
 ### 创建 CPU-only dev env
 
 ```python
-spec = A.WorkPlatformSpec(
-    name="mynotebook",                    # 字母数字
+spec = A.WorkPlatformSpec.notebook(
+    name="mynotebook",
     resource_group="4V100",
     image="192.168.108.1:5000/pytorch/pytorch:21.10-py3",
-    command="sleep 3600",
-    cards=0, cpu=2, memory_gb=4,
-    card_kind="CPU",
-    shm_size=1,
+    cpu=2,
+    memory_gb=4,
 )
-wp = c.workplatforms.create(spec, idempotent=True)
-print(f"wpId={wp.wp_id}  status={wp.wp_status}")
+result = c.workplatforms.create(spec, idempotent=True)
+wp = result.unwrap()
+print(f"created={result.created} reused={result.reused} wpId={wp.wp_id}")
 ```
 
 ### 创建带 GPU 的
@@ -268,20 +329,21 @@ spec = A.WorkPlatformSpec(
     cpu=4, memory_gb=16,
     command="sleep infinity",
 )
-wp = c.workplatforms.create(spec)
+wp = c.workplatforms.create(spec).entity
 ```
 
 ### 查 / 删 / 拿 Jupyter URL
 
 ```python
-wp = c.workplatforms.get(wp.wp_id)
+wp = c.workplatforms.get(wp)
 print(wp.wp_status, wp.group_name, wp.cpu, wp.cards)
 
-info = c.workplatforms.jupyter_url(wp.wp_id)
+info = c.workplatforms.jupyter_url(wp)
 print(info)      # 含 URL + token
 
-# dev env 的删除比 task 简单：直接 DELETE {id}
-c.workplatforms.delete(wp.wp_id)
+# dev env 删除同样返回 OperationResult
+deleted = c.workplatforms.delete(wp)
+print(deleted.action, deleted.target_id)
 ```
 
 ### Commit 运行中环境为镜像
@@ -294,6 +356,7 @@ result = c.workplatforms.commit_image(
     pod_id=wp.raw["podId"],
     comment="调好 deepspeed",
 )
+print(result.action, result.raw)
 ```
 
 ---
@@ -309,7 +372,7 @@ existing = c.tasks.get("GFM")                # 已知能跑的任务
 spec = presets.from_existing(existing)        # 反推 TaskSpec
 spec.command = "bash /{USER}/new_script.sh"
 spec.name = "GFMv2"
-new_task = c.tasks.create(spec)
+new_task = c.tasks.create(spec).entity
 ```
 
 ### 克隆历史 dev env（最稳的创建方式）
@@ -321,7 +384,7 @@ template["wpName"] = "cloneX"
 template["command"] = "sleep 7200"
 template["wpType"] = "COMMON_WP"     # 模板里没这个字段，补上
 
-wp = c.workplatforms.create_raw(template)
+wp = c.workplatforms.create_raw(template).entity
 ```
 
 ---
@@ -360,8 +423,7 @@ import aistation as A
 PREFERRED = ["8A100_80", "8A100_80_normal", "8A100_80_large"]
 
 def main() -> int:
-    c = A.AiStationClient.from_config()
-    c.ensure_auth()
+    c = A.AiStationClient()
 
     # 已经有占卡任务就跳过
     running = [t for t in c.tasks.list(status_flag=0) if t.name.startswith("autograb")]
@@ -387,12 +449,12 @@ def main() -> int:
         name_prefix="autograb",
     )
     try:
-        task = c.tasks.create(spec)
+        task = c.tasks.create(spec).entity
     except A.AiStationError as e:
         print(f"submit failed: {e.describe()}")
         return 0
 
-    print(f"✓ grabbed {task.id} on {target.group_name}")
+    print(f"✓ grabbed {task.id if task else '-'} on {target.group_name}")
     return 0
 
 if __name__ == "__main__":
@@ -445,14 +507,14 @@ aistation whoami                           # 读本地缓存，不走网络
 import aistation as A
 
 try:
-    c.tasks.create(spec)
+    result = c.tasks.create(spec)
 except A.SpecValidationError as e:
     print(f"参数有误: {e.field_name}  {e}")
 except A.PermissionDenied:
     print("role 权限不足")
 except A.TokenExpired:
     c.login()
-    c.tasks.create(spec)
+    result = c.tasks.create(spec)
 except A.AiStationError as e:
     print(e.describe())
     # [IRESOURCE_GPU_NUM_OUT_OF_RESOURCE_GROUP_LIMIT] 资源组 8A100_80 只能提交加速卡个数大于等于1的任务
@@ -500,8 +562,7 @@ import aistation as A
 from aistation.watch import wait_running, wait_pods
 
 def main() -> int:
-    c = A.AiStationClient.from_config()
-    c.ensure_auth()
+    c = A.AiStationClient()
 
     spec = A.presets.gpu_hold(
         resource_group="8A100_80",
@@ -510,13 +571,13 @@ def main() -> int:
         hours=2,
     )
     try:
-        task = c.tasks.create(spec)
+        task = c.tasks.create(spec).entity
     except A.AiStationError as e:
         print(e.describe()); return 1
 
-    print(f"submitted id={task.id}; waiting for Running...")
+    print(f"submitted id={task.id if task else '-'}; waiting for Running...")
     try:
-        task = wait_running(c, task.id, timeout=600)
+        task = wait_running(c, task.id, timeout=600)  # type: ignore[union-attr]
     except TimeoutError:
         print("not running after 10 min (still Pending on server)")
         return 2

@@ -11,12 +11,14 @@ from typing import TYPE_CHECKING
 
 from .errors import AiStationError, TransportError
 from .modeling.tasks import Pod, Task
+from .modeling.workplatforms import WorkPlatform
 
 if TYPE_CHECKING:
     from .client import AiStationClient
 
 
 DEFAULT_TERMINAL_STATUSES = frozenset({"Running", "Succeeded", "Failed", "Terminating"})
+DEFAULT_WORKPLATFORM_READY_STATUSES = frozenset({"Running", "Halt", "Stopped", "Failed"})
 
 
 def watch_task(
@@ -106,3 +108,59 @@ def wait_pods(
             return ready
         time.sleep(interval)
     raise TimeoutError(f"no pods with ports after {timeout}s for task {task_id}")
+
+
+def watch_workplatform(
+    client: "AiStationClient",
+    wp_id: str,
+    *,
+    interval: float = 5.0,
+    timeout: float = 600.0,
+    until: set[str] | None = None,
+) -> Iterator[WorkPlatform]:
+    """Yield the WorkPlatform each time its status changes."""
+    stop_set = set(until) if until is not None else set(DEFAULT_WORKPLATFORM_READY_STATUSES)
+    deadline = time.monotonic() + timeout
+    last_status: str | None = None
+
+    while True:
+        if time.monotonic() > deadline:
+            raise TimeoutError(
+                f"watch_workplatform timed out after {timeout}s (last status={last_status!r})"
+            )
+        try:
+            wp = client.workplatforms.get(wp_id)
+        except TransportError:
+            time.sleep(interval)
+            continue
+        except AiStationError:
+            raise
+
+        if wp.wp_status != last_status:
+            yield wp
+            last_status = wp.wp_status
+        if wp.wp_status in stop_set:
+            break
+        time.sleep(interval)
+
+
+def wait_workplatform_ready(
+    client: "AiStationClient",
+    wp_id: str,
+    *,
+    timeout: float = 600.0,
+    interval: float = 5.0,
+) -> WorkPlatform:
+    """Block until the dev env reaches a ready or terminal status."""
+    last: WorkPlatform | None = None
+    for wp in watch_workplatform(
+        client,
+        wp_id,
+        interval=interval,
+        timeout=timeout,
+        until={"Running", "Halt", "Stopped", "Failed"},
+    ):
+        last = wp
+    if last is None:
+        last = client.workplatforms.get(wp_id)
+    return last

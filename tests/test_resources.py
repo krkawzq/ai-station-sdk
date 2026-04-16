@@ -30,9 +30,11 @@ def test_groups_are_aggregated_from_nodes(load_json_fixture) -> None:
     api = GroupsAPI(_DummyClient(nodes))
 
     groups = api.list()
+    matched = api.resolve_many("POOL-A")
 
     assert [group.group_name for group in groups] == ["GPU-POOL-A", "GPU-POOL-B"]
     assert api.resolve_id("GPU-POOL-A") == "group-gpu-a"
+    assert matched[0].group_id == "group-gpu-a"
     group = api.by_name("GPU-POOL-A")
     assert group is not None
     assert group.total_cards == 16

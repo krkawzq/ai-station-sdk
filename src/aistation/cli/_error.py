@@ -19,6 +19,8 @@ EXIT_BUSINESS = 7
 
 
 def classify(exc: BaseException) -> int:
+    if isinstance(exc, (sdk_errors.NotFoundError, LookupError)):
+        return EXIT_NOT_FOUND
     if isinstance(exc, sdk_errors.SpecValidationError):
         return EXIT_SPEC
     if isinstance(exc, sdk_errors.InvalidCredentials):
@@ -37,7 +39,7 @@ def classify(exc: BaseException) -> int:
         return EXIT_SPEC
     if isinstance(exc, sdk_errors.AiStationError):
         return EXIT_BUSINESS
-    if isinstance(exc, (ValueError, LookupError)):
+    if isinstance(exc, ValueError):
         return EXIT_NOT_FOUND
     return EXIT_GENERAL
 

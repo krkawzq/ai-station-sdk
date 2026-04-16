@@ -12,10 +12,12 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from ._refs import coerce_image_ref
 from .errors import SpecValidationError
 
 if TYPE_CHECKING:
     from .modeling.common import User
+    from .modeling.images import Image
     from .specs import TaskSpec
 
 
@@ -61,12 +63,13 @@ def _check_name(name: str) -> None:
         )
 
 
-def _check_image(image: str) -> None:
-    if not image:
+def _check_image(image: str | Image) -> None:
+    resolved_image = coerce_image_ref(image)
+    if not resolved_image:
         raise SpecValidationError("image is required", field_name="image")
-    if ":" not in image.rsplit("/", 1)[-1]:
+    if ":" not in resolved_image.rsplit("/", 1)[-1]:
         raise SpecValidationError(
-            f"image={image!r} must include a tag (e.g. 'pytorch/pytorch:21.10-py3')",
+            f"image={resolved_image!r} must include a tag (e.g. 'pytorch/pytorch:21.10-py3')",
             field_name="image",
         )
 

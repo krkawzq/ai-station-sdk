@@ -10,6 +10,8 @@ from ..config import Config
 from ..errors import AiStationError, TokenExpired, TransportError
 from .envelope import check_flag
 
+RETRYABLE_HTTP_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
+
 
 def raw_request(
     session: requests.Session,
@@ -31,6 +33,11 @@ def raw_request(
         response = session.request(method, f"{base_url}{path}", **kwargs)
     except requests.RequestException as exc:
         raise TransportError(str(exc), path=path) from exc
+    if is_retryable_http_status(response.status_code):
+        raise TransportError(
+            _transient_http_message(path, response.status_code, response.text),
+            path=path,
+        )
     try:
         body = response.json()
     except ValueError as exc:
@@ -43,7 +50,7 @@ def raw_request(
 def request_with_retry(
     *,
     raw_request_fn: Callable[..., dict[str, Any]],
-    login_fn: Callable[[], Any],
+    reauth_fn: Callable[[], Any] | None,
     prime_token_header_fn: Callable[[], None],
     config: Config,
     method: str,
@@ -62,7 +69,9 @@ def request_with_retry(
             body = raw_request_fn(method, path, params=params, json=json, timeout=effective_timeout)
             return check_flag(body, path)
         except TokenExpired:
-            login_fn()
+            if reauth_fn is None:
+                raise
+            reauth_fn()
             body = raw_request_fn(method, path, params=params, json=json, timeout=effective_timeout)
             return check_flag(body, path)
         except TransportError as exc:
@@ -73,6 +82,17 @@ def request_with_retry(
             raise
     assert last_transport_err is not None
     raise last_transport_err
+
+
+def is_retryable_http_status(status_code: int) -> bool:
+    return status_code in RETRYABLE_HTTP_STATUSES
+
+
+def _transient_http_message(path: str, status_code: int, text: str) -> str:
+    summary = " ".join(text.strip().split())[:160]
+    if summary:
+        return f"transient HTTP {status_code} from {path}: {summary}"
+    return f"transient HTTP {status_code} from {path}"
 
 
 def timeout_for(config: Config, path: str) -> float:

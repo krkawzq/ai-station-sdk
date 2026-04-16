@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+from aistation.errors import AiStationError
+from aistation.modeling import OperationResult
 from aistation.modeling import Image, JobVolume, Node, Pod, Task, User
 
 
@@ -74,3 +78,35 @@ def test_job_volume_to_api_round_trip() -> None:
     assert payload["isUnzip"] is True
     assert restored.volume_mount == "/data"
     assert restored.storage_name == "ssdwork"
+
+
+def test_operation_result_require_entity_and_unwrap() -> None:
+    result = OperationResult[Task](action="create", resource_type="task", target_id="task-1")
+
+    with pytest.raises(AiStationError) as exc_info:
+        result.require_entity()
+
+    assert exc_info.value.err_code == "SDK_RESULT_UNRESOLVED"
+
+    task = Task.from_api(
+        {
+            "id": "task-1",
+            "name": "demo",
+            "status": "Running",
+            "userId": "u1",
+            "userName": "alice",
+            "projectId": "g1",
+            "projectName": "project",
+            "resGroupId": "group-1",
+            "resGroupName": "GPU-POOL",
+            "jobType": "pytorch",
+            "image": "registry.example.invalid/ml/pytorch:latest",
+            "imageType": "pytorch",
+            "command": "sleep 30",
+            "config": {"worker": {"nodeNum": 1, "cpuNum": 1, "acceleratorCardNum": 0, "memory": 1}},
+        }
+    )
+    resolved = OperationResult[Task](action="create", resource_type="task", entity=task)
+
+    assert resolved.require_entity().id == "task-1"
+    assert resolved.unwrap().name == "demo"

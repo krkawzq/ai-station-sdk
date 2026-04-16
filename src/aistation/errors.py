@@ -131,6 +131,30 @@ _ERROR_GUIDE: dict[str, tuple[str, str]] = {
         "验证码多次刷新仍未输入",
         "确认网络通后重试，或去 UI 先成功登录一次重置计数",
     ),
+    "SDK_REAUTH_DISABLED": (
+        "当前调用不会自动重新登录",
+        "显式调用 client.login()，或把 reauth_policy 改成 if_possible",
+    ),
+    "SDK_MAX_PAGES_EXCEEDED": (
+        "分页超过调用方设置的最大页数限制",
+        "增大 max_pages，或传 None 取消限制后重试",
+    ),
+    "SDK_RESULT_UNRESOLVED": (
+        "操作已完成，但 SDK 没能解析出实体对象",
+        "调用 result.raw / result.payload 检查返回值，或显式再 get()/resolve() 一次",
+    ),
+    "SDK_INVALID_REFERENCE": (
+        "传入的资源引用为空",
+        "传合法的 id / 名称，或传包含有效 id 的模型对象",
+    ),
+    "SDK_NOT_FOUND": (
+        "未找到匹配资源",
+        "检查传入的 id / 名称，或先调用 list()/resolve_many() 看候选项",
+    ),
+    "SDK_AMBIGUOUS_MATCH": (
+        "匹配到多个候选资源",
+        "传更精确的 id / 名称，或先调用 resolve_many() 查看候选项",
+    ),
 }
 
 
@@ -187,6 +211,38 @@ class InvalidCredentials(AuthError):
 
 class TokenExpired(AuthError):
     """Token missing or expired."""
+
+
+class NotFoundError(AiStationError):
+    """Requested resource was not found."""
+
+    def __init__(self, resource_type: str, query: str) -> None:
+        self.resource_type = resource_type
+        self.query = query
+        super().__init__(
+            f"{resource_type} not found: {query!r}",
+            err_code="SDK_NOT_FOUND",
+            err_message=f"{resource_type} not found: {query}",
+            path=None,
+        )
+
+
+class AmbiguousMatchError(AiStationError):
+    """Reference matched more than one resource."""
+
+    def __init__(self, resource_type: str, query: str, *, matches: list[str]) -> None:
+        self.resource_type = resource_type
+        self.query = query
+        self.matches = matches
+        message = f"ambiguous {resource_type} reference: {query!r}"
+        if matches:
+            message = f"{message} -> {', '.join(matches)}"
+        super().__init__(
+            message,
+            err_code="SDK_AMBIGUOUS_MATCH",
+            err_message=message,
+            path=None,
+        )
 
 
 class PermissionDenied(AiStationError):

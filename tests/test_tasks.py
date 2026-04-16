@@ -2,17 +2,27 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from aistation.client import AiStationClient
 from aistation.config import AuthData, Config
+from aistation.errors import AmbiguousMatchError
 from aistation.modeling import User
 from aistation.specs import TaskSpec
 
-from .helpers import make_task
+from .helpers import make_group, make_image, make_task
 
 
 class _DummyGroups:
+    def resolve(self, name_or_id: str):
+        class _Group:
+            group_id = "group-cpu"
+
+        assert name_or_id in {"CPU", "group-cpu"}
+        return _Group()
+
     def resolve_id(self, name_or_id: str) -> str:
-        assert name_or_id == "CPU"
+        assert name_or_id in {"CPU", "group-cpu"}
         return "group-cpu"
 
 
@@ -26,6 +36,7 @@ class _TestClient(AiStationClient):
         self.posts: list[tuple[str, dict | None]] = []
         self.retries: list[tuple[str, str, dict | None]] = []
         self.list_all_rows: list[dict] = []
+        self.list_all_calls = 0
         self.get_map: dict[tuple[str, str | None], object] = {}
         self.user = User(
             user_id="u1",
@@ -59,6 +70,7 @@ class _TestClient(AiStationClient):
 
     def list_all(self, path: str, *, params=None, timeout=None):
         del path, params, timeout
+        self.list_all_calls += 1
         return list(self.list_all_rows)
 
     def _request_with_retry(self, method: str, path: str, *, params=None, json=None, timeout=None):
@@ -126,8 +138,11 @@ def test_build_payload_matches_current_contract() -> None:
         card_kind="CPU",
     )
 
-    payload = client.tasks.create(spec, dry_run=True)
+    result = client.tasks.create(spec, dry_run=True)
+    payload = result.payload
 
+    assert result.entity is None
+    assert result.created is False
     assert payload["name"] == "HoldCPU1"
     assert payload["projectId"] == "project-1"
     assert payload["resGroupId"] == "group-cpu"
@@ -178,7 +193,9 @@ def test_create_idempotent_returns_existing_task_without_post() -> None:
 
     result = client.tasks.create(spec)
 
-    assert result.name == "HoldCPU2"
+    assert result.reused is True
+    assert result.entity is not None
+    assert result.entity.name == "HoldCPU2"
     assert client.posts == []
 
 
@@ -207,7 +224,8 @@ def test_build_payload_converts_env_and_dataset_fields() -> None:
         ],
     )
 
-    payload = client.tasks.create(spec, dry_run=True, validate=False)
+    result = client.tasks.create(spec, dry_run=True, validate=False)
+    payload = result.payload
 
     assert payload["type"] == "mpi"
     assert payload["distFlag"] is True
@@ -257,12 +275,154 @@ def test_check_resources_delete_stop_pods_and_logs() -> None:
     deleted = client.tasks.delete(["task-1", "task-2"])
     stopped = client.tasks.stop("task-3")
 
-    assert checked == {"checked": True}
+    assert checked.action == "check_resources"
+    assert checked.raw == {"checked": True}
     assert pods[0].external_urls == ["198.51.100.10:30080"]
     assert log_text == "log-lines"
-    assert deleted["ok"] is True
-    assert stopped["ok"] is True
+    assert deleted.action == "delete"
+    assert deleted.raw["ok"] is True
+    assert deleted.target_ids == ["task-1", "task-2"]
+    assert stopped.action == "stop"
+    assert stopped.raw["ok"] is True
+    assert stopped.target_id == "task-3"
     assert client.retries == [
         ("DELETE", "/api/iresource/v1/train", {"jobIdList": ["task-1", "task-2"]}),
         ("POST", "/api/iresource/v1/train/task-3/stop", None),
     ]
+
+
+def test_create_returns_operation_result_and_wait_helper(monkeypatch) -> None:
+    client = _build_client()
+    created = make_task(task_id="created-1", name="HoldCPU3", status="Pending")
+    client.get_map[
+        (
+            "/api/iresource/v1/train",
+            json.dumps({"id": "created-1", "statusFlag": 0, "page": 1, "pageSize": 1}, sort_keys=True),
+        )
+    ] = {"data": [_task_to_api_dict(created)]}
+    spec = TaskSpec(
+        name="HoldCPU3",
+        resource_group="CPU",
+        image="pytorch/pytorch:21.10-py3",
+        command="sleep 30",
+        cards=0,
+        cpu=1,
+        card_kind="CPU",
+    )
+
+    monkeypatch.setattr(
+        "aistation.tasks.wait_running",
+        lambda client_, task_id, timeout, interval: make_task(task_id=task_id, name="HoldCPU3", status="Running"),
+    )
+    monkeypatch.setattr(
+        "aistation.tasks.wait_pods",
+        lambda client_, task_id, timeout, interval: [],
+    )
+
+    result = client.tasks.create(spec, idempotent=False)
+    waited = client.tasks.create_and_wait(spec, idempotent=False, wait_for_pods=True)
+
+    assert result.created is True
+    assert result.entity is not None
+    assert result.entity.id == "created-1"
+    assert waited.waited is True
+    assert waited.entity is not None
+    assert waited.entity.status == "Running"
+    assert waited.extras["pods"] == []
+
+
+def test_task_resolve_and_ambiguity() -> None:
+    client = _build_client()
+    client.list_all_rows = [
+        _task_to_api_dict(make_task(task_id="task-1", name="AlphaTask", status="Running")),
+        _task_to_api_dict(make_task(task_id="task-2", name="BetaTask", status="Succeeded")),
+    ]
+
+    resolved = client.tasks.resolve("betatask")
+    matched = client.tasks.resolve_many("task-1")
+
+    assert resolved.id == "task-2"
+    assert matched[0].name == "AlphaTask"
+
+    client.list_all_rows = [
+        _task_to_api_dict(make_task(task_id="task-1", name="SameTask", status="Running")),
+        _task_to_api_dict(make_task(task_id="task-2", name="SameTask", status="Succeeded")),
+    ]
+
+    with pytest.raises(AmbiguousMatchError):
+        client.tasks.resolve("SameTask", refresh=True)
+
+
+def test_task_list_cache_refresh_and_object_refs() -> None:
+    client = _build_client()
+    task = make_task(task_id="task-1", name="CacheTask")
+    client.list_all_rows = [_task_to_api_dict(task)]
+
+    first = client.tasks.list()
+    second = client.tasks.list()
+
+    assert first[0].id == "task-1"
+    assert second[0].id == "task-1"
+    assert client.list_all_calls == 1
+
+    client.list_all_rows = []
+    assert client.tasks.list()[0].id == "task-1"
+    assert client.tasks.list(refresh=True) == []
+
+    group = make_group(group_id="group-cpu", group_name="CPU")
+    image = make_image(name="registry.example.invalid/pytorch/pytorch", tag="21.10-py3")
+    spec = TaskSpec(
+        name="ObjectInput1",
+        resource_group=group,
+        image=image,
+        command="sleep 30",
+        cards=0,
+        cpu=1,
+        card_kind="CPU",
+    )
+
+    dry_run = client.tasks.create(spec, dry_run=True)
+    stopped = client.tasks.stop(task)
+    deleted = client.tasks.delete([task])
+
+    assert dry_run.payload["resGroupId"] == "group-cpu"
+    assert dry_run.payload["image"] == "registry.example.invalid/pytorch/pytorch:21.10-py3"
+    assert stopped.target_id == "task-1"
+    assert deleted.target_ids == ["task-1"]
+
+
+def test_task_create_retries_read_after_write(monkeypatch) -> None:
+    client = _build_client()
+    spec = TaskSpec(
+        name="RetryTask1",
+        resource_group="CPU",
+        image="pytorch/pytorch:21.10-py3",
+        command="sleep 30",
+        cards=0,
+        cpu=1,
+        card_kind="CPU",
+    )
+    created = make_task(task_id="created-1", name="RetryTask1", status="Pending")
+    attempts = {"count": 0}
+    original_get = client.get
+
+    def fake_get(path: str, params: dict | None = None, *, timeout=None):
+        key = json.dumps(params, sort_keys=True) if params is not None else None
+        if path == "/api/iresource/v1/train" and key == json.dumps(
+            {"id": "created-1", "statusFlag": 0, "page": 1, "pageSize": 1},
+            sort_keys=True,
+        ):
+            attempts["count"] += 1
+            if attempts["count"] < 3:
+                return {"data": []}
+            return {"data": [_task_to_api_dict(created)]}
+        return original_get(path, params, timeout=timeout)
+
+    client.get = fake_get  # type: ignore[method-assign]
+    monkeypatch.setattr("aistation._consistency.time.sleep", lambda _: None)
+
+    result = client.tasks.create(spec, idempotent=False)
+
+    assert result.entity is not None
+    assert result.entity.id == "created-1"
+    assert attempts["count"] == 3

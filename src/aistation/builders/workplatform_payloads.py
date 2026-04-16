@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .._refs import coerce_image_ref
 from ..specs import WorkPlatformSpec
 from .common import build_env_entries, build_port_pairs
 
@@ -40,7 +41,7 @@ def build_workplatform_payload(
         "wpPodNum": spec.pod_num,
         "frameWork": spec.frame_work,
         "imageType": spec.image_type,
-        "image": spec.image,
+        "image": coerce_image_ref(spec.image),
         "groupId": group_id,
         "cpu": spec.cpu,
         "memory": spec.memory_gb,

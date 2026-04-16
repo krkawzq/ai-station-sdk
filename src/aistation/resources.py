@@ -3,6 +3,8 @@ from __future__ import annotations
 import builtins
 from typing import TYPE_CHECKING, Any
 
+from ._resolve import resolve_many as _resolve_many
+from ._resolve import resolve_one as _resolve_one
 from .cache import TTLCache
 from .modeling.resources import Node, ResourceGroup
 
@@ -83,11 +85,30 @@ class GroupsAPI:
                 return group
         return None
 
+    def resolve_many(self, query: str) -> list[ResourceGroup]:
+        return _resolve_many(
+            query,
+            self.list(),
+            key_fns=(
+                lambda item: item.group_id,
+                lambda item: item.group_name,
+            ),
+        )
+
+    def resolve(self, name_or_id: str) -> ResourceGroup:
+        return _resolve_one(
+            name_or_id,
+            self.list(),
+            key_fns=(
+                lambda item: item.group_id,
+                lambda item: item.group_name,
+            ),
+            label_fn=lambda item: f"{item.group_name} ({item.group_id})",
+            resource_type="resource group",
+        )
+
     def resolve_id(self, name_or_id: str) -> str:
-        for group in self.list():
-            if group.group_id == name_or_id or group.group_name == name_or_id:
-                return group.group_id
-        raise ValueError(f"resource group not found: {name_or_id!r}")
+        return self.resolve(name_or_id).group_id
 
     @staticmethod
     def _aggregate(nodes: builtins.list[Node]) -> builtins.list[ResourceGroup]:

@@ -42,6 +42,7 @@ def test_images_list_filter_resolve_and_cache(load_json_fixture) -> None:
     again = api.list()
     refreshed = api.list(refresh=True)
     resolved = api.resolve("ml/pytorch:latest")
+    matched = api.resolve_many("pytorch")
     types = api.types()
 
     assert len(public_pytorch) == 1
@@ -49,6 +50,7 @@ def test_images_list_filter_resolve_and_cache(load_json_fixture) -> None:
     assert len(refreshed) == 3
     assert public_pytorch[0].owner == "system-user"
     assert resolved.tag == "latest"
+    assert matched[0].tag == "latest"
     assert [item.name for item in types] == ["pytorch", "tensorflow"]
     assert client.list_calls == 2
     assert client.type_calls == 1
@@ -72,7 +74,9 @@ def test_images_mutation_helpers(load_json_fixture) -> None:
     api.list()
     api.list()
 
-    assert checked["path"] == "/api/iresource/v1/images/check"
-    assert imported["body"]["imageName"] == "docker.io/library/python"
+    assert checked.action == "check"
+    assert checked.raw["path"] == "/api/iresource/v1/images/check"
+    assert imported.action == "import_external"
+    assert imported.raw["body"]["imageName"] == "docker.io/library/python"
     assert progress == {"id": "import-1", "progress": 50}
     assert client.list_calls == 2

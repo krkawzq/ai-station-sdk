@@ -7,8 +7,13 @@ from aistation.specs import WorkPlatformSpec as NewWorkPlatformSpec
 
 def test_public_api_exports_current_surface() -> None:
     assert A.AiStationClient is not None
+    assert A.AsyncAiStationClient is not None
+    assert A.aio is not None
     assert A.TaskSpec is not None
     assert A.TTLCache is not None
+    assert A.AuthStatus is not None
+    assert A.OperationResult is not None
+    assert A.ReauthPolicy is not None
     assert A.lookup_error_guide("IBASE_NO_PERMISSION") is not None
     assert A.presets is not None
     assert A.recommend is not None

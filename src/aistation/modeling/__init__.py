@@ -2,6 +2,7 @@ from .common import Port, User
 from .forms import FormContext
 from .images import Image, ImageType_
 from .resources import Node, ResourceGroup
+from .runtime import AuthStatus, OperationResult
 from .tasks import JobVolume, Pod, Task, TaskType
 from .workplatforms import WorkPlatform
 
@@ -18,4 +19,6 @@ __all__ = [
     "TaskType",
     "WorkPlatform",
     "FormContext",
+    "AuthStatus",
+    "OperationResult",
 ]

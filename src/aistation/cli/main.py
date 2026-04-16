@@ -136,7 +136,7 @@ def _version_cmd(
 
 
 def main() -> None:
-    """Module-level entry when someone runs ``python -m aistation``."""
+    """Module-level entry for direct module execution."""
     app()
 
 
