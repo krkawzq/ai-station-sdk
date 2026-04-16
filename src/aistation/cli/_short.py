@@ -109,10 +109,12 @@ def workplatform(env: WorkPlatform) -> dict[str, Any]:
         "group_id": env.group_id,
         "group_name": env.group_name,
         "image": env.image,
+        "image_type": env.image_type,
         "frame_work": env.frame_work,
         "cpu": env.cpu,
         "memory_gb": env.memory_gb,
         "cards": env.cards,
+        "card_kind": env.card_kind,
         "create_time": env.create_time,
     }
 

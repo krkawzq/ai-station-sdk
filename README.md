@@ -10,7 +10,9 @@ AI Station 的非官方 Python SDK 和 CLI。
 pip install ai-station-sdk
 ```
 
-如果你需要 CLI：
+基础安装现在已经包含 CLI 运行所需依赖。
+
+如果你想要更好的验证码终端渲染能力（Pillow）：
 
 ```bash
 pip install "ai-station-sdk[cli]"
@@ -18,7 +20,7 @@ pip install "ai-station-sdk[cli]"
 
 ## CLI
 
-CLI 主要用来查询状态。
+CLI 可以查询状态，也支持 task/env 的创建、等待和删除辅助操作。
 
 ```bash
 aistation login # 交互式登录
@@ -29,8 +31,9 @@ aistation login # 交互式登录
 # aistation login
 
 aistation status
-aistation gpus --free
-aistation tasks
+aistation gpus
+aistation task list
+aistation env list
 ```
 
 ## Python

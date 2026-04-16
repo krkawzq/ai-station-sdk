@@ -10,6 +10,7 @@ This reference covers:
 
 - Everything exported from `aistation.__all__`
 - Everything exported from `aistation.aio.__all__`
+- The task/env operational CLI surface intended for shell and skill orchestration
 - The complete method surface of the client-attached API objects:
   - `client.nodes`
   - `client.groups`
@@ -27,9 +28,9 @@ This reference covers:
   - async mirrors under `aistation.aio`
 - Public data models, enums, configuration objects, and error types
 
-This reference does not document the CLI or internal/private implementation modules such as:
+This reference does not document internal/private implementation modules such as:
 
-- `aistation.cli.*`
+- `aistation.cli._*`
 - `aistation.transport.*`
 - `aistation.builders.*`
 - `aistation._*`
@@ -41,11 +42,12 @@ Those modules may be importable, but they are implementation details rather than
 If you are new to the SDK, read the files in this order:
 
 1. [clients.md](./clients.md)
-2. [resources-and-images.md](./resources-and-images.md)
-3. [tasks.md](./tasks.md)
-4. [workplatforms.md](./workplatforms.md)
-5. [helpers.md](./helpers.md)
-6. [reference.md](./reference.md)
+2. [cli.md](./cli.md)
+3. [resources-and-images.md](./resources-and-images.md)
+4. [tasks.md](./tasks.md)
+5. [workplatforms.md](./workplatforms.md)
+6. [helpers.md](./helpers.md)
+7. [reference.md](./reference.md)
 
 If you already know the SDK and only need exact signatures or behavior, jump directly to the topic file you need.
 
@@ -63,6 +65,15 @@ If you already know the SDK and only need exact signatures or behavior, jump dir
 | `specs` | [tasks.md](./tasks.md), [workplatforms.md](./workplatforms.md) |
 | `validation` | [helpers.md](./helpers.md) |
 | `watch` | [tasks.md](./tasks.md), [workplatforms.md](./workplatforms.md) |
+
+### Operational CLI
+
+| Surface | Where documented |
+| --- | --- |
+| `aistation task ...` | [cli.md](./cli.md) |
+| `aistation env ...` | [cli.md](./cli.md) |
+| task/env JSON output conventions | [cli.md](./cli.md) |
+| task/env spec-file format | [cli.md](./cli.md) |
 
 ### Configuration and Auth
 
@@ -174,4 +185,4 @@ You should prefer the high-level APIs whenever possible. The lower-level helpers
 
 ## Version
 
-This tutorial set is written for SDK version `0.2.0`.
+This tutorial set is written for SDK version `0.3.0`.

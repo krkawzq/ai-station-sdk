@@ -21,7 +21,7 @@
 
 ```bash
 cd ai-station-sdk
-uv sync --all-extras          # 含 CLI: typer / rich / pillow
+uv sync --all-extras          # 含可选 Pillow 验证码渲染
 ```
 
 验证：
@@ -470,7 +470,7 @@ crontab：
 
 ## 9. CLI 速查
 
-所有 CLI 命令都是**只读**的；创建/删除请用 Python。
+CLI 现在覆盖查询，以及 task/env 的创建、等待、停止/删除等常用操作。
 
 ```bash
 # 登录

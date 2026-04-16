@@ -25,11 +25,13 @@ from ..config import load_config
 
 app = typer.Typer(
     name="aistation",
-    help="Unofficial read-only CLI for the Westlake AI Station. "
-         "Write operations (create/delete/stop) are SDK-only by design.",
+    help="Unofficial CLI for the Westlake AI Station. "
+         "Supports read operations plus task/env lifecycle helpers.",
     no_args_is_help=True,
     add_completion=False,
 )
+task_app = typer.Typer(help="Training task operations", no_args_is_help=True, add_completion=False)
+env_app = typer.Typer(help="Development environment operations", no_args_is_help=True, add_completion=False)
 
 
 @app.callback()
@@ -78,14 +80,32 @@ app.command("images", help="List images")(query_cmd.cmd_images)
 
 
 # ---------- tasks (read-only) ----------
-app.command("tasks", help="List my training tasks")(tasks_cmd.cmd_tasks)
-app.command("task", help="Show a single task's detail + pods")(tasks_cmd.cmd_task_get)
+task_app.command("list", help="List my training tasks")(tasks_cmd.cmd_tasks)
+task_app.command("get", help="Show one task's detail + pods")(tasks_cmd.cmd_task_get)
+task_app.command("resolve", help="Resolve a task query to one canonical task")(tasks_cmd.cmd_task_resolve)
+task_app.command("pods", help="List pods for one task")(tasks_cmd.cmd_task_pods)
+task_app.command("logs", help="Read task logs")(tasks_cmd.cmd_task_logs)
+task_app.command("wait", help="Wait until a task reaches a desired state")(tasks_cmd.cmd_task_wait)
+task_app.command("create", help="Create a training task from flags or a spec file")(tasks_cmd.cmd_task_create)
+task_app.command("delete", help="Delete one or more task records")(tasks_cmd.cmd_task_delete)
+task_app.command("stop", help="Stop a running task")(tasks_cmd.cmd_task_stop)
+app.add_typer(task_app, name="task")
+
+# Legacy flat aliases.
+app.command("tasks", hidden=True)(tasks_cmd.cmd_tasks)
+app.command("task-get", hidden=True)(tasks_cmd.cmd_task_get)
+app.command("task-resolve", hidden=True)(tasks_cmd.cmd_task_resolve)
+app.command("task-pods", hidden=True)(tasks_cmd.cmd_task_pods)
+app.command("task-wait", hidden=True)(tasks_cmd.cmd_task_wait)
+app.command("task-create", hidden=True)(tasks_cmd.cmd_task_create)
+app.command("task-delete", hidden=True)(tasks_cmd.cmd_task_delete)
+app.command("task-stop", hidden=True)(tasks_cmd.cmd_task_stop)
 
 
-@app.command("task-logs", help="Print task logs (plain text)")
+@app.command("task-logs", hidden=True)
 def _task_logs_cmd(
     ctx: typer.Context,
-    task_id: Annotated[str, typer.Argument(help="Task ID")],
+    task_id: Annotated[str, typer.Argument(help="Task ID or name")],
     pod: Annotated[str | None, typer.Option("--pod", help="Specific pod name")] = None,
     json_out: Annotated[bool, typer.Option("--json", help="Output formatted JSON")] = False,
     short_out: Annotated[bool, typer.Option("--short", help="When output is JSON, only print key fields")] = False,
@@ -93,10 +113,25 @@ def _task_logs_cmd(
     tasks_cmd.cmd_task_logs(ctx, task_id, pod=pod, json_out=json_out, short_out=short_out)
 
 
-# ---------- envs (read-only) ----------
-app.command("envs", help="List my dev envs (workplatforms)")(envs_cmd.cmd_envs)
-app.command("env", help="Show a single dev env's detail")(envs_cmd.cmd_env_get)
-app.command("envs-history", help="List historical dev envs")(envs_cmd.cmd_envs_history)
+# ---------- envs ----------
+env_app.command("list", help="List my dev envs")(envs_cmd.cmd_envs)
+env_app.command("get", help="Show one dev env")(envs_cmd.cmd_env_get)
+env_app.command("history", help="List historical dev envs")(envs_cmd.cmd_envs_history)
+env_app.command("resolve", help="Resolve an env query to one canonical env")(envs_cmd.cmd_env_resolve)
+env_app.command("urls", help="Get Jupyter and shell access info")(envs_cmd.cmd_env_urls)
+env_app.command("wait", help="Wait until a dev env is ready")(envs_cmd.cmd_env_wait)
+env_app.command("create", help="Create a dev env from flags or a spec file")(envs_cmd.cmd_env_create)
+env_app.command("delete", help="Delete a dev env")(envs_cmd.cmd_env_delete)
+app.add_typer(env_app, name="env")
+
+app.command("envs", hidden=True)(envs_cmd.cmd_envs)
+app.command("env-get", hidden=True)(envs_cmd.cmd_env_get)
+app.command("envs-history", hidden=True)(envs_cmd.cmd_envs_history)
+app.command("env-resolve", hidden=True)(envs_cmd.cmd_env_resolve)
+app.command("env-urls", hidden=True)(envs_cmd.cmd_env_urls)
+app.command("env-wait", hidden=True)(envs_cmd.cmd_env_wait)
+app.command("env-create", hidden=True)(envs_cmd.cmd_env_create)
+app.command("env-delete", hidden=True)(envs_cmd.cmd_env_delete)
 
 
 # ---------- dashboard ----------
