@@ -1,5 +1,5 @@
 [project]
-name = "aistation"
+name = "ai-station-sdk"
 version = "0.1.0"
 description = "Unofficial Python SDK for Westlake University AI Station"
 readme = "README.md"

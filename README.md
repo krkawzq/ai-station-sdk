@@ -7,8 +7,13 @@ AI Station 的非官方 Python SDK 和 CLI。
 ## 安装
 
 ```bash
-cd ai-station-sdk
-uv sync --extra cli
+pip install ai-station-sdk
+```
+
+如果你需要 CLI：
+
+```bash
+pip install "ai-station-sdk[cli]"
 ```
 
 ## CLI
