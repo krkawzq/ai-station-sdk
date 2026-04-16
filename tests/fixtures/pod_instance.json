@@ -1,0 +1,30 @@
+{
+  "flag": true,
+  "resData": {
+    "data": [
+      {
+        "podId": "pod-test-001",
+        "podName": "worker-test-001",
+        "podNameChanged": "202604160001",
+        "podStatus": "Running",
+        "memory": 0,
+        "gpuIds": "GPU-TEST-UUID-0001",
+        "gpuNames": "gpu-node-b1_0",
+        "podGpuType": "Test-GPU-40GB",
+        "createDateTime": 1776237705000,
+        "nodeIp": "198.51.100.24",
+        "nodeName": "gpu-node-b1",
+        "podIp": "203.0.113.8",
+        "ports": [
+          {
+            "port": 8080,
+            "targetPort": 8080,
+            "nodePort": 30080
+          }
+        ],
+        "restartCount": 0,
+        "switchType": "IB"
+      }
+    ]
+  }
+}

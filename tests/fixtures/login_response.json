@@ -1,0 +1,20 @@
+{
+  "flag": true,
+  "resData": {
+    "token": "token-test-user-001",
+    "userId": "user-test-001",
+    "account": "test-user",
+    "userName": "Test User",
+    "groupId": "group-test-001",
+    "userType": 0,
+    "roleType": 2,
+    "isDownload": true,
+    "modelTest": false,
+    "fileSharing": false,
+    "isInvalid": false,
+    "isFirstLogin": false,
+    "pwdExpireDays": 84,
+    "operationPwdExpireDays": -512,
+    "pwdExpireWarning": 0
+  }
+}

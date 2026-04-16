@@ -1,0 +1,72 @@
+{
+  "flag": true,
+  "resData": {
+    "total": 1,
+    "pageSize": 20,
+    "currentPage": 1,
+    "totalPages": 1,
+    "data": [
+      {
+        "id": "task-1",
+        "name": "synthetic-training-task",
+        "status": "Running",
+        "userId": "user-test-001",
+        "userName": "test-user",
+        "projectId": "group-test-001",
+        "projectName": "test-project",
+        "resGroupId": "group-gpu-b",
+        "resGroupName": "GPU-POOL-B",
+        "jobType": "pytorch",
+        "image": "registry.example.invalid/ml/pytorch:latest",
+        "imageType": "pytorch",
+        "imageFlag": 0,
+        "command": "bash /workspace/run.sh",
+        "startScript": "",
+        "execDir": "/workspace",
+        "mountDir": "/workspace",
+        "scriptDir": "/workspace",
+        "logOut": "/workspace/logs",
+        "logPersistence": "master",
+        "config": {
+          "worker": {
+            "nodeNum": 1,
+            "cpuNum": 4,
+            "acceleratorCardNum": 2,
+            "memory": 0,
+            "minNodeNum": -1
+          }
+        },
+        "gpuInfo": {
+          "count": 2
+        },
+        "podInfo": {
+          "podCount": 1
+        },
+        "switchType": "ib",
+        "distFlag": false,
+        "mpiFlag": false,
+        "isElastic": false,
+        "shmSize": 4,
+        "ports": "22,8888",
+        "emergencyFlag": false,
+        "taskType": 1,
+        "taskTypeName": "训练任务",
+        "createDateTime": 1776237705000,
+        "startDateTime": 1776237710000,
+        "finishDateTime": null,
+        "runTime": 3600,
+        "nodeName": "gpu-node-b1",
+        "jobVolume": [
+          {
+            "fileModel": 2,
+            "functionModel": 2,
+            "volumeMount": "/workspace",
+            "storageName": "master",
+            "bucket": ""
+          }
+        ],
+        "statusReason": ""
+      }
+    ]
+  }
+}

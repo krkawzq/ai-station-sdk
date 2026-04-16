@@ -1,0 +1,62 @@
+{
+  "flag": true,
+  "resData": {
+    "total": 3,
+    "pageSize": 50,
+    "currentPage": 1,
+    "totalPages": 1,
+    "data": [
+      {
+        "id": "img-public-pytorch",
+        "userId": "1",
+        "userName": "system-user",
+        "roleType": 0,
+        "imageType": "pytorch",
+        "imageName": "registry.example.invalid/ml/pytorch",
+        "imageTag": "latest",
+        "size": 6412547274,
+        "share": 2,
+        "pullCount": 19618,
+        "makeType": 0,
+        "imageComment": "",
+        "createTime": "2023-07-11 13:00:53",
+        "updateTime": "2026-04-15 18:19:50",
+        "logoId": "logo-public-pytorch.png"
+      },
+      {
+        "id": "img-public-tf",
+        "userId": "1",
+        "userName": "system-user",
+        "roleType": 0,
+        "imageType": "tensorflow",
+        "imageName": "registry.example.invalid/ml/tensorflow",
+        "imageTag": "2.15",
+        "size": 5412547274,
+        "share": 2,
+        "pullCount": 618,
+        "makeType": 0,
+        "imageComment": "",
+        "createTime": "2023-09-11 13:00:53",
+        "updateTime": "2026-04-15 19:19:50",
+        "logoId": null
+      },
+      {
+        "id": "img-private-dev",
+        "userId": "2",
+        "userName": "test-user",
+        "roleType": 2,
+        "imageType": "other",
+        "imageName": "registry.example.invalid/test-user/custom-dev",
+        "imageTag": "latest",
+        "size": 123456789,
+        "share": 1,
+        "pullCount": 5,
+        "makeType": 4,
+        "imageComment": "",
+        "createTime": "2026-04-01 08:00:00",
+        "updateTime": "2026-04-16 10:00:00",
+        "logoId": null
+      }
+    ]
+  }
+}
