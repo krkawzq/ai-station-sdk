@@ -102,10 +102,9 @@ for g in c.groups.list():
         print(f"{g.group_name:<22} {g.card_type:<28} free={g.free_cards}/{g.total_cards}")
 # 8A100_80_dev           NVIDIA-A800-SXM4-80GB         free=2/16
 # 4V100_towmode          Tesla-V100-SXM2-32GB          free=2/20
-# zangzelin              NVIDIA-A100-SXM4-80GB         free=8/8
 ```
 
-> ⚠️ 看到 `free>0` **不代表你能提交** — 例如 `zangzelin` 是私有组，提交会收到 `GROUP_CAN_NOT_BE_USED`。
+> ⚠️ 看到 `free>0` **不代表你能提交** 
 > 用过一次成功的组，或从 `tasks.list()` 里看到自己有任务的组，通常就能用。
 
 ### 按资源组看节点明细
